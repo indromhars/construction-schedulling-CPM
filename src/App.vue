@@ -149,23 +149,29 @@
 export default {
   data() {
     return {
+      // Data baru untuk aktivitas yang akan ditambahkan
       newActivity: {
-        name: "",
-        duration: 0,
-        unit: "days",
-        dependency: "",
+        name: "", // Nama aktivitas
+        duration: 0, // Durasi aktivitas
+        unit: "days", // Satuan durasi (days, weeks, months)
+        dependency: "", // Ketergantungan pada aktivitas lain
       },
-      activities: [],
+      // List aktivitas yang dimuat dari sessionStorage saat aplikasi dimulai
+      activities: this.loadActivities(),
     };
   },
   methods: {
+    // Tambahkan aktivitas baru ke daftar aktivitas dan simpan ke sessionStorage
     addActivity() {
+      // Pisahkan string dependency menjadi array berdasarkan koma
       const dependencies = this.newActivity.dependency
         ? this.newActivity.dependency.split(",").map(dep => dep.trim())
         : [];
 
+      // Konversi durasi ke hari (berdasarkan satuan yang dipilih)
       let durationInDays = this.convertToDays(this.newActivity.duration, this.newActivity.unit);
 
+      // Tambahkan aktivitas baru ke daftar
       this.activities.push({
         name: this.newActivity.name,
         duration: durationInDays,
@@ -175,51 +181,83 @@ export default {
         EF: 0, // Earliest Finish
         LS: 0, // Latest Start
         LF: 0, // Latest Finish
-        float: 0, // Float waktu
+        float: 0, // Waktu float (kelonggaran)
       });
 
-      this.newActivity = { name: "", duration: 0, unit: "days", dependency: "" }; // Reset form input
+      // Simpan data aktivitas ke sessionStorage
+      this.saveActivities();
+
+      // Reset form input ke nilai awal
+      this.newActivity = { name: "", duration: 0, unit: "days", dependency: "" };
     },
+
+    // Konversi durasi aktivitas ke dalam satuan hari
     convertToDays(duration, unit) {
       if (unit === "weeks") return duration * 7; // 1 minggu = 7 hari
       if (unit === "months") return Math.round(duration * 30.44); // Rata-rata 30.44 hari per bulan
-      return duration; // Default: durasi dalam hari
+      return duration; // Jika satuannya hari, kembalikan nilai apa adanya
     },
+
+    // Hitung Critical Path Method (CPM) untuk semua aktivitas
     calculateCPM() {
-      // Hitung ES dan EF
+      // Hitung Earliest Start (ES) dan Earliest Finish (EF)
       this.activities.forEach(activity => {
         if (activity.dependency.length === 0) {
+          // Jika tidak ada dependency, ES = 0
           activity.ES = 0;
         } else {
-          // Cari EF maksimum dari semua dependensi
+          // Jika ada dependency, ES adalah EF terbesar dari dependency
           const dependencyEFs = activity.dependency.map(depName => {
             const depActivity = this.activities.find(a => a.name === depName);
             return depActivity ? depActivity.EF : 0;
           });
           activity.ES = Math.max(...dependencyEFs);
         }
+        // Hitung EF berdasarkan ES + durasi
         activity.EF = activity.ES + activity.duration;
       });
 
-      // Hitung LF, LS, dan float
+      // Hitung durasi proyek (EF terbesar dari semua aktivitas)
       const projectDuration = Math.max(...this.activities.map(a => a.EF));
 
+      // Hitung Latest Finish (LF), Latest Start (LS), dan float
       [...this.activities].reverse().forEach(activity => {
         if (activity === this.activities[this.activities.length - 1]) {
+          // Aktivitas terakhir memiliki LF sama dengan durasi proyek
           activity.LF = projectDuration;
         } else {
+          // LF adalah LS terkecil dari aktivitas berikutnya yang bergantung pada aktivitas ini
           const nextActivities = this.activities.filter(a => a.dependency.includes(activity.name));
           const nextLSs = nextActivities.map(next => next.LS);
           activity.LF = nextLSs.length > 0 ? Math.min(...nextLSs) : projectDuration;
         }
+        // Hitung LS berdasarkan LF - durasi
         activity.LS = activity.LF - activity.duration;
+        // Hitung float (waktu kelonggaran)
         activity.float = activity.LS - activity.ES;
       });
+
+      // Simpan hasil kalkulasi ke sessionStorage
+      this.saveActivities();
     },
+
+    // Bersihkan semua data aktivitas dari aplikasi dan sessionStorage
     clearData() {
-        this.activities = [];
-    }
-  }
+      this.activities = []; // Kosongkan daftar aktivitas
+      sessionStorage.removeItem("activities"); // Hapus data dari sessionStorage
+    },
+
+    // Muat data aktivitas dari sessionStorage
+    loadActivities() {
+      const cachedData = sessionStorage.getItem("activities");
+      return cachedData ? JSON.parse(cachedData) : []; // Jika ada data di cache, parsing JSON-nya, jika tidak, kembalikan array kosong
+    },
+
+    // Simpan data aktivitas ke sessionStorage
+    saveActivities() {
+      sessionStorage.setItem("activities", JSON.stringify(this.activities));
+    },
+  },
 };
 </script>
 
