@@ -3,6 +3,28 @@
     <div class="container mx-auto bg-white shadow-md rounded-lg p-6">
       <h1 class="text-2xl font-bold text-gray-800 mb-6">CPM Project Scheduler</h1>
 
+      <!-- Description Section -->
+      <div class="text-sm text-gray-700 mb-6">
+        <p>
+          <strong>CPM Project Scheduler</strong> adalah aplikasi berbasis web yang dirancang untuk membantu manajer proyek dan tim dalam merencanakan, mengelola, dan menganalisis jadwal proyek menggunakan metode <strong>Critical Path Method (CPM)</strong>. CPM adalah teknik manajemen proyek yang digunakan untuk mengidentifikasi jalur paling kritis dalam proyek, yaitu rangkaian aktivitas yang menentukan durasi minimum proyek tersebut.
+        </p>
+        <p>Dengan alat ini, pengguna dapat:</p>
+        <ul class="list-disc pl-6 space-y-2">
+          <li>
+            <strong>Menambahkan Aktivitas Proyek:</strong> Memasukkan detail aktivitas seperti nama, durasi, unit waktu, dan ketergantungan antar aktivitas.
+          </li>
+          <li>
+            <strong>Menghitung Jalur Kritis:</strong> Menentukan <strong>Earliest Start (ES)</strong>, <strong>Earliest Finish (EF)</strong>, <strong>Latest Start (LS)</strong>, <strong>Latest Finish (LF)</strong>, serta <strong>Float</strong> setiap aktivitas. Float digunakan untuk mengetahui fleksibilitas waktu dalam menyelesaikan aktivitas tanpa memengaruhi durasi total proyek.
+          </li>
+          <li>
+            <strong>Mengidentifikasi Aktivitas Kritis:</strong> Aktivitas dengan Float = 0 berada pada jalur kritis, sehingga harus diselesaikan tepat waktu agar proyek tidak tertunda.
+          </li>
+        </ul>
+        <p>
+          Aplikasi ini cocok digunakan untuk berbagai jenis proyek, baik konstruksi, pengembangan perangkat lunak, maupun proyek lain yang melibatkan banyak aktivitas terhubung. Dengan <strong>CPM Project Scheduler</strong>, pengelolaan proyek menjadi lebih terstruktur, memungkinkan tim untuk bekerja lebih efektif dan efisien.
+        </p>
+      </div>
+
       <!-- Form for Adding Activities -->
       <form @submit.prevent="addActivity" class="mb-6 space-y-4">
         <h2 class="text-xl font-semibold text-gray-700">Add Project Activity</h2>
@@ -138,47 +160,61 @@ export default {
   },
   methods: {
     addActivity() {
-        let durationInDays = this.convertToDays(this.newActivity.duration, this.newActivity.unit);
-        this.activities.push({
-            name: this.newActivity.name,
-            duration: durationInDays,
-            unit: this.newActivity.unit,
-            dependency: this.newActivity.dependency,
-            ES: 0,
-            EF: 0,
-            LS: 0,
-            LF: 0,
-            float: 0
-        });
-        this.newActivity = { name: "", duration: 0, unit: "days", dependency: "" };
+      const dependencies = this.newActivity.dependency
+        ? this.newActivity.dependency.split(",").map(dep => dep.trim())
+        : [];
+
+      let durationInDays = this.convertToDays(this.newActivity.duration, this.newActivity.unit);
+
+      this.activities.push({
+        name: this.newActivity.name,
+        duration: durationInDays,
+        unit: this.newActivity.unit,
+        dependency: dependencies,
+        ES: 0, // Earliest Start
+        EF: 0, // Earliest Finish
+        LS: 0, // Latest Start
+        LF: 0, // Latest Finish
+        float: 0, // Float waktu
+      });
+
+      this.newActivity = { name: "", duration: 0, unit: "days", dependency: "" }; // Reset form input
     },
     convertToDays(duration, unit) {
-        if (unit === "weeks") return duration * 7;
-        if (unit === "months") return duration * 30;
-        return duration;
+      if (unit === "weeks") return duration * 7; // 1 minggu = 7 hari
+      if (unit === "months") return Math.round(duration * 30.44); // Rata-rata 30.44 hari per bulan
+      return duration; // Default: durasi dalam hari
     },
     calculateCPM() {
-        this.activities.forEach(activity => {
-            if (!activity.dependency) {
-                activity.ES = 0;
-            } else {
-                const depActivity = this.activities.find(a => a.name === activity.dependency);
-                activity.ES = depActivity ? depActivity.EF : 0;
-            }
-            activity.EF = activity.ES + activity.duration;
-        });
+      // Hitung ES dan EF
+      this.activities.forEach(activity => {
+        if (activity.dependency.length === 0) {
+          activity.ES = 0;
+        } else {
+          // Cari EF maksimum dari semua dependensi
+          const dependencyEFs = activity.dependency.map(depName => {
+            const depActivity = this.activities.find(a => a.name === depName);
+            return depActivity ? depActivity.EF : 0;
+          });
+          activity.ES = Math.max(...dependencyEFs);
+        }
+        activity.EF = activity.ES + activity.duration;
+      });
 
-        const projectDuration = Math.max(...this.activities.map(a => a.EF));
-        [...this.activities].reverse().forEach(activity => {
-            if (activity === this.activities[this.activities.length - 1]) {
-                activity.LF = projectDuration;
-            } else {
-                const nextActivity = this.activities.find(a => a.dependency === activity.name);
-                activity.LF = nextActivity ? nextActivity.LS : projectDuration;
-            }
-            activity.LS = activity.LF - activity.duration;
-            activity.float = activity.LS - activity.ES;
-        });
+      // Hitung LF, LS, dan float
+      const projectDuration = Math.max(...this.activities.map(a => a.EF));
+
+      [...this.activities].reverse().forEach(activity => {
+        if (activity === this.activities[this.activities.length - 1]) {
+          activity.LF = projectDuration;
+        } else {
+          const nextActivities = this.activities.filter(a => a.dependency.includes(activity.name));
+          const nextLSs = nextActivities.map(next => next.LS);
+          activity.LF = nextLSs.length > 0 ? Math.min(...nextLSs) : projectDuration;
+        }
+        activity.LS = activity.LF - activity.duration;
+        activity.float = activity.LS - activity.ES;
+      });
     },
     clearData() {
         this.activities = [];
