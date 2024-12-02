@@ -105,6 +105,7 @@
             <th class="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">LF</th>
             <th class="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">Float</th>
             <th class="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">Critical?</th>
+            <th class="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">Action</th>
           </tr>
         </thead>
         <tbody>
@@ -123,6 +124,14 @@
             <td class="py-2 px-4 border-b text-gray-700">{{ activity.LF }}</td>
             <td class="py-2 px-4 border-b text-gray-700">{{ activity.float }}</td>
             <td class="py-2 px-4 border-b text-gray-700">{{ activity.float === 0 ? "Yes" : "No" }}</td>
+            <td class="py-2 px-4 border-b text-gray-700">
+              <button
+                class="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600"
+                @click="removeActivity(activity.name)"
+              >
+                Delete
+              </button>
+            </td>
           </tr>
         </tbody>
       </table>
@@ -189,6 +198,11 @@ export default {
 
       // Reset form input ke nilai awal
       this.newActivity = { name: "", duration: 0, unit: "days", dependency: "" };
+    },
+
+    removeActivity(activityName) {
+      this.activities = this.activities.filter(activity => activity.name !== activityName);
+      this.saveActivities(); // Perbarui sessionStorage setelah penghapusan
     },
 
     // Konversi durasi aktivitas ke dalam satuan hari
